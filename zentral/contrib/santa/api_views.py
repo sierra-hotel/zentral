@@ -188,3 +188,23 @@ class RuleSetUpdate(APIView):
             lambda: post_santa_ruleset_update_events(request, ruleset_update_event, rule_update_events)
         )
         return Response(ruleset_update_event)
+
+
+class RuleSearch(APIView):
+    parser_classes = [JSONParser, YAMLParser]
+    permission_required = ("santa.view_ruleset")
+    permission_classes = [IsAuthenticated, DjangoPermissionRequired]
+
+    def post(self, request):
+        sha256 = request.data.get('sha256')
+        if not sha256:
+            return Response(data={'message': f"You must supply a search parameter named 'sha256' -- the hash of the binary to search for."},
+                            status=400)
+        try:
+            target = Target.objects.get(sha256=sha256)
+            rule = Rule.objects.get(target=target)
+        except (Target.DoesNotExist, Rule.DoesNotExist):
+            return Response(data={'message': f"No rules found for {sha256}"},
+                            status=404)
+        return Response(data=rule.serialize_for_event(),
+                        status=200)
